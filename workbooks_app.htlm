@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caminando Conmigo - Workbooks Interactivos</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Configuración de fuente Inter */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; 
+        }
+        /* Estilos de Card y Hover */
+        .workbook-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid #e2e8f0; 
+            border-radius: 0.75rem; 
+            cursor: default;
+        }
+        .workbook-card:hover:not(.locked) {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.1);
+            cursor: pointer; 
+        }
+        
+        /* Estilos de Estado */
+        .locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: #f8fafc; 
+            border-left: 5px solid #94a3b8; 
+        }
+        .unlocked {
+            background-color: #ffffff;
+            border-left: 5px solid #10b981; /* Esmeralda */
+        }
+        .completed {
+            background-color: #eff6ff; 
+            border-left: 5px solid #3b82f6; /* Azul */
+        }
+        
+        /* Estilo del Botón Principal (Primary Button) */
+        .btn-primary {
+            background-color: #ef4444; 
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: background-color 0.3s, transform 0.1s;
+            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3);
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: #dc2626; 
+            transform: translateY(-1px);
+            box-shadow: 0 6px 10px -2px rgba(239, 68, 68, 0.4);
+        }
+        .btn-primary:disabled {
+            background-color: #9ca3af; 
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* Estilo para el contenedor principal de la derecha */
+        #workbook-display {
+            background-color: #ffffff;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        /* Estilo del campo de respuesta */
+        .textarea-response {
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            min-height: 150px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .textarea-response:focus {
+            outline: none;
+            border-color: #ef4444; 
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+        }
+        /* Indicador de guardado */
+        #save-status {
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        /* Estilo específico para los campos de seguimiento diario (más pequeños) */
+        .daily-input {
+            min-height: 60px;
+        }
+
+        /* Estilo de encabezados para diferenciar las secciones */
+        .section-header {
+            font-size: 1.5rem; /* 24px */
+            font-weight: 700; /* bold */
+            margin-top: 2.5rem; /* 40px */
+            margin-bottom: 1.5rem; /* 24px */
+            border-bottom: 2px solid #fecaca; /* red-200 */
+            padding-bottom: 0.5rem;
+            color: #4b5563; /* gray-700 */
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <div id="app" class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <!-- Header -->
+        <header class="text-center py-10 bg-white shadow-xl rounded-xl mb-10">
+            <h1 class="text-4xl sm:text-5xl font-extrabold text-gray-900">
+                <span class="text-red-600">Caminando Conmigo</span> Workbooks
+            </h1>
+            <p id="greeting-text" class="mt-3 text-xl text-gray-500 font-light">
+                Tu viaje de 90 días: Reflexión, Enfoque y Renovación.
+            </p>
+        </header>
+
+        <!-- Loading/Error Indicator -->
+        <div id="loading-indicator" class="text-center p-12 text-2xl font-semibold text-gray-600 hidden rounded-xl bg-white shadow-lg">
+            Cargando tu progreso... ⏳
+        </div>
+        <div id="error-message" class="text-center p-4 bg-red-100 border-l-8 border-red-500 text-red-700 hidden rounded-lg shadow-md mb-8" role="alert">
+            <p class="font-bold text-lg">⚠️ ¡Atención! Error de Conexión</p>
+            <p id="error-text" class="mt-1 text-sm">No se pudo conectar a la base de datos. Intenta recargar la página.</p>
+        </div>
+
+
+        <!-- Main Content Wrapper -->
+        <div id="content-area" class="grid lg:grid-cols-3 gap-8 mt-8 hidden">
+            
+            <!-- Columna de Workbooks (Panel Izquierdo/Superior) -->
+            <div class="lg:col-span-1 space-y-6">
+                <h2 class="text-2xl font-bold text-gray-800 border-b-2 border-red-100 pb-2 mb-4">Tu Viaje Mes a Mes</h2>
+                <div id="workbook-list" class="space-y-4">
+                    <!-- Cards de Workbooks se insertarán aquí -->
+                </div>
+            </div>
+
+            <!-- Columna de Contenido (Panel Derecho/Inferior) -->
+            <div class="lg:col-span-2">
+                <div id="workbook-display" class="bg-white p-6 sm:p-10 rounded-xl shadow-lg min-h-[500px] flex flex-col justify-center items-center text-center">
+                    
+                    <h2 class="text-3xl font-extrabold text-gray-900 mb-6" id="display-title">¡Bienvenido/a a tu Viaje!</h2>
+                    
+                    <!-- Registration Form -->
+                    <div id="registration-form" class="max-w-md w-full p-8 rounded-xl shadow-inner border border-gray-100">
+                        <p class="text-lg text-gray-700 mb-6 font-medium">Para desbloquear el **Workbook de Octubre** y comenzar tu viaje, por favor regístrate:</p>
+                        
+                        <input type="text" id="name-input" placeholder="Tu Nombre Completo" class="w-full p-3 border border-gray-300 focus:ring-red-500 focus:border-red-500 mb-4 rounded-lg" required>
+
+                        <input type="email" id="email-input" placeholder="Tu Correo Electrónico" class="w-full p-3 border border-gray-300 focus:ring-red-500 focus:border-red-500 mb-6 rounded-lg" required>
+                        <button id="register-button" class="btn-primary w-full" onclick="handleRegistration()">
+                            Registrar y Comenzar
+                        </button>
+                    </div>
+
+                    <!-- Workbook Content Area (Interactive) -->
+                    <div id="interactive-workbook" class="hidden w-full text-left">
+                        <p id="display-snippet" class="text-xl italic text-gray-600 mb-8 border-b pb-4"></p>
+                        
+                        <!-- Contenedor del Formulario Interactivo -->
+                        <form id="workbook-form" onsubmit="event.preventDefault();">
+                            <!-- Los campos interactivos se insertarán aquí -->
+                            <div id="form-fields" class="space-y-6"></div>
+                        </form>
+                        
+                        <!-- Estado de Guardado -->
+                        <div id="save-status" class="mt-8 text-sm text-gray-500 text-center opacity-0">
+                            Guardando...
+                        </div>
+
+                        <div class="mt-8 flex justify-center">
+                            <!-- Botón de Completar/Bloqueado - Estilo Primario -->
+                            <button id="completion-button" class="btn-primary w-full max-w-sm" onclick="markAsCompleted()">
+                                Marcar como Completado y Desbloquear Siguiente
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Completion Message -->
+                    <div id="completion-message" class="hidden p-10 bg-green-50 rounded-xl border border-green-300 w-full max-w-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20 text-green-600 mx-auto mb-6 animate-pulse" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                        </svg>
+                        <p class="text-3xl font-extrabold text-gray-800 mb-3">¡Viaje Concluido!</p>
+                        <p class="text-xl text-gray-700 font-medium">Has completado tu viaje de 90 días con éxito. ¡Felicidades! Sigue aplicando todo lo aprendido.</p>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Establecer nivel de log para depuración de Firestore
+        setLogLevel('debug');
+
+        // Global variables from Canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; 
+
+        let db;
+        let auth;
+        let userId = null;
+        let unsubscribe = () => {};
+        let saveTimeout; // Para el guardado automático
+
+        // State (global to access from event handlers)
+        window.appState = {
+            currentStep: 0, 
+            name: null, 
+            isAuthReady: false,
+            activeWorkbookId: null,
+            workbookResponses: {} // { workbookId: { fieldKey: 'respuesta' } }
+        };
+
+        // Estructura de contenido CLAVE para el relleno interactivo (CONTENIDO COMPLETO Y FIEL)
+        const workbooksData = [
+            { 
+                id: 1, 
+                title: 'Workbook 1: Octubre', 
+                subtitle: 'Evaluación sin Juicio', 
+                snippet: 'Tu espacio para Pausar y Reflexionar. Responde con calma y honestidad. (Episodio de Octubre)', 
+                sections: [
+                    { key: 'revelacion_episodio', label: 'SECCIÓN 1: La Revelación. ¿Cuál fue la revelación, la idea o el pensamiento más importante que te dejó el episodio de Octubre?', type: 'textarea' },
+                    { key: 'creencias_limitantes', label: 'SECCIÓN 2: Creencia Limitante. ¿Qué creencia limitante o patrón estás dispuesto a mirar sin juicio? ¿Qué te dice?', type: 'textarea' },
+                    { key: 'compromiso_semanal', label: 'SECCIÓN 3: Compromiso Sostenible. ¿Cuál será mi compromiso semanal (pequeño y sostenible) para este mes?', type: 'textarea' },
+                    { key: 'lugar_registro', label: 'SECCIÓN 3: Mi Registro. ¿Dónde escribiré/registraré este compromiso cada día?', type: 'textarea', className: 'daily-input', minHeight: '60px' },
+                    { key: 'seguimiento_lunes', label: 'SECCIÓN 4: Seguimiento Diario (Lunes) - Cumplí mi compromiso:', type: 'textarea', className: 'daily-input', minHeight: '60px' },
+                    { key: 'seguimiento_martes', label: 'SECCIÓN 4: Seguimiento Diario (Martes) - Cumplí mi compromiso:', type: 'textarea', className: 'daily-input', minHeight: '60px' },
+                    { key: 'seguimiento_miercoles', label: 'SECCIÓN 4: Seguimiento Diario (Miércoles) - Cumplí mi compromiso:', type: 'textarea', className: 'daily-input', minHeight: '60px' },
+                    { key: 'seguimiento_jueves', label: 'SECCIÓN 4: Seguimiento Diario (Jueves) - Cumplí mi compromiso:', type: 'textarea', className: 'daily-input', minHeight: '60px' },
+                    { key: 'seguimiento_viernes', label: 'SECCIÓN 4: Seguimiento Diario (Viernes) - Cumplí mi compromiso:', type: 'textarea', className: 'daily-input', minHeight: '60px' },
+                    { key: 'seguimiento_sabado', label: 'SECCIÓN 4: Seguimiento Diario (Sábado) - Cumplí mi compromiso:', type: 'textarea', className: 'daily-input', minHeight: '60px' },
+                    { key: 'seguimiento_domingo', label: 'SECCIÓN 4: Seguimiento Diario (Domingo) - Cumplí mi compromiso:', type: 'textarea', className: 'daily-input', minHeight: '60px' },
+                    { key: 'dias_cumplidos', label: 'SECCIÓN 4: Resumen Semanal. Días que cumplí mi compromiso (número de 7):', type: 'text', className: 'daily-input', minHeight: '60px' },
+                    { key: 'impedimento_semana', label: 'SECCIÓN 4: Resumen Semanal. Si hubo días que no cumplí, ¿qué creo que me lo impidió?', type: 'textarea' },
+                    { key: 'aprendizaje_compromiso', label: 'SECCIÓN 4: Resumen Semanal. ¿Qué aprendí de esta experiencia sobre mí mismo/a y mi compromiso?', type: 'textarea' },
+                    { key: 'ajustes_compromiso', label: 'SECCIÓN 4: Resumen Semanal. ¿Qué ajuste(s) podría hacer para la próxima semana si este compromiso sigue siendo relevante?', type: 'textarea' },
+                    { key: 'notas_personales', label: 'SECCIÓN 5: NOTAS PERSONALES. Espacio para tus pensamientos, ideas o revelaciones.', type: 'textarea', minHeight: '200px', placeholder: 'Aquí puedes escribir pensamientos sueltos, dibujar (simbólicamente) o anotar revelaciones.' },
+                    { key: 'carta_futuro', label: 'SECCIÓN 6: CIERRE: CARTA BREVE. Mi Carta al Yo Futuro (en 30 días).', type: 'textarea', minHeight: '200px', placeholder: 'Querido/a yo del [Fecha de hoy + 30 días], \n\n[Tu mensaje]\n\nCon cariño y esperanza,\nTu yo de [Fecha de hoy]' },
+                    { key: 'fecha_no_abrir', label: 'SECCIÓN 6: CIERRE. No abrir hasta:', type: 'text', className: 'daily-input', minHeight: '60px' },
+                ]
+            },
+            { 
+                id: 2, 
+                title: 'Workbook 2: Noviembre', 
+                subtitle: 'Enfoque y Productividad Consciente', 
+                snippet: 'El mes de la acción estratégica. Aplica el 80/20, Eisenhower y Pomodoro. (Episodio de Noviembre)', 
+                sections: [
+                    { key: 'area_clave_8020', label: 'SECCIÓN 1: Principio 80/20. ¿Cuál es el 20% de tus esfuerzos que produce el 80% de tus resultados? (Identifica el área clave para enfocarte).', type: 'textarea' },
+                    { key: 'tarea_importante_no_urgente', label: 'SECCIÓN 2: Matriz de Eisenhower. ¿Cuál es mi ÚNICA tarea más importante de la semana? (La que es Importante y No Urgente: Agenda).', type: 'textarea', placeholder: 'La tarea que más impacto tendrá en mis metas y que debo agendar.' },
+                    { key: 'lugar_agenda', label: 'SECCIÓN 2: Lugar y Momento. ¿Dónde y cuándo la voy a ejecutar (día y hora)?', type: 'text', className: 'daily-input', minHeight: '60px' },
+                    { key: 'compromiso_pomodoro', label: 'SECCIÓN 3: El Método Pomodoro. ¿Cuántos Pomodoros haré esta semana y en qué proyecto/tarea los aplicaré?', type: 'textarea' },
+                    { key: 'lugar_registro_pomodoro', label: 'SECCIÓN 4: Mi Compromiso de Enfoque. ¿Cómo registraré mi compromiso diario (ej. checklist, app)?', type: 'text', className: 'daily-input', minHeight: '60px' },
+                    { key: 'preguntas_previas', label: 'SECCIÓN 4: Preguntas Previas al Inicio. Antes de comenzar cada día, me preguntaré:', type: 'textarea', placeholder: 'Ejemplo: ¿Registré mis aprendizajes o ajustes necesarios?' },
+                    { key: 'importancia_compromiso', label: 'SECCIÓN 4: Mi Motivación. ¿Por qué este compromiso es importante para mí ahora?', type: 'textarea' },
+                    { key: 'seguimiento_diario', label: 'SECCIÓN 5: SEGUIMIENTO DIARIO. Registro de mi Compromiso de Enfoque. (Aquí registra tus notas diarias):', type: 'textarea', minHeight: '200px', placeholder: 'Lunes: Pomodoros completados: __ | Nota: \nMartes: Pomodoros completados: __ | Nota: \n...' },
+                    { key: 'dias_enfoque', label: 'SECCIÓN 5: Reflexión al Final de la Semana. ¿Cuántos días logré mantener mi enfoque según mi compromiso? (número de 7):', type: 'text', className: 'daily-input', minHeight: '60px' },
+                    { key: 'dificil_enfoque', label: 'SECCIÓN 5: Reflexión al Final de la Semana. ¿Qué fue lo más difícil de mantener el enfoque?', type: 'textarea' },
+                    { key: 'estrategia_mejor', label: 'SECCIÓN 5: Reflexión al Final de la Semana. ¿Qué estrategia funcionó mejor para mí?', type: 'textarea' },
+                    { key: 'ajuste_proxima', label: 'SECCIÓN 5: Reflexión al Final de la Semana. ¿Qué ajuste haré para la próxima semana?', type: 'textarea' },
+                    { key: 'notas_noviembre', label: 'SECCIÓN 6: NOTAS. Espacio para ideas, insights y observaciones.', type: 'textarea', minHeight: '200px', placeholder: 'Anotar ideas que surgieron durante tus pomodoros, reflejar sobre patrones, etc.' }
+                ]
+            },
+            { 
+                id: 3, 
+                title: 'Workbook 3: Diciembre', 
+                subtitle: 'Hábitos que Sostienen', 
+                snippet: 'Construye sistemas y rutinas que te sostengan en el largo plazo. (Episodio de Diciembre)', 
+                sections: [
+                    { key: 'h_actual', label: 'SECCIÓN 1: Habit Stacking (Apilamiento). Mi Hábito Actual (el que ya hago sin esfuerzo):', type: 'text', className: 'daily-input', minHeight: '60px' },
+                    { key: 'h_nuevo_completo', label: 'SECCIÓN 1: Habit Stacking. Mi Hábito Nuevo (el que quiero implementar) COMPLETO:', type: 'textarea' },
+                    { key: 'h_nuevo_simple', label: 'SECCIÓN 2: Diseño de Hábito. El UN hábito que quiero construir (Pequeño y Sencillo):', type: 'textarea' },
+                    { key: 'contexto_activador', label: 'SECCIÓN 2: Contexto Activador. ¿Qué haré justo antes de este nuevo hábito? (Para que funcione como señal):', type: 'text', className: 'daily-input', minHeight: '60px' },
+                    { key: 'proposito_del_habito', label: 'SECCIÓN 3: Propósito Profundo. ¿Por qué quiero construir este hábito realmente? (Mi "por qué" profundo y no superficial).', type: 'textarea' },
+                    { key: 'sentimiento_31dic', label: 'SECCIÓN 3: Recompensa Emocional. ¿Cómo me sentiré el 31 de diciembre si logro sostener este hábito?', type: 'textarea' },
+                    { key: 'secreto_sostener', label: 'SECCIÓN 5: Sostenibilidad. ¿Qué diré a alguien que me pregunte cómo mantuve este hábito? (Imagina que ya lo lograste. ¿Cuál fue tu secreto?)', type: 'textarea' },
+                    { key: 'firma_compromiso', label: 'SECCIÓN 5: Compromiso. Firma Simbólica:', type: 'text', className: 'daily-input', minHeight: '60px' },
+                    { key: 'fecha_compromiso', label: 'SECCIÓN 5: Compromiso. Fecha:', type: 'text', className: 'daily-input', minHeight: '60px' },
+                    { key: 'lema_personal', label: 'SECCIÓN 6: MI COMPROMISO. Mi Lema Personal del Mes:', type: 'textarea' },
+                    { key: 'donde_lema', label: 'SECCIÓN 6: MI COMPROMISO. ¿Dónde lo escribiré para verlo todos los días?', type: 'textarea', className: 'daily-input', minHeight: '60px' },
+                    { key: 'escribir_lema', label: 'SECCIÓN 6: MI COMPROMISO. Escribe tu lema aquí, con tu mejor caligrafía (simulada):', type: 'textarea', minHeight: '100px' },
+                    { key: 'notas_diciembre', label: 'SECCIÓN 7: NOTAS. Espacio para reflexiones y observaciones.', type: 'textarea', minHeight: '200px', placeholder: 'Reflexionar sobre tu proceso de construcción de hábitos, anotar ideas, etc.' }
+                ]
+            },
+            { 
+                id: 4, 
+                title: 'Workbook 4: Cierre', 
+                subtitle: 'Celebrar, Revisar y Renovar', 
+                snippet: 'El ritual de cierre consciente. Integra todo lo vivido en tu viaje. (Episodio de Cierre)', 
+                sections: [
+                    { key: 'revisar_honest', label: 'SECCIÓN 3: Revisión Honesta. ¿Qué es lo que más me enorgullece de mi viaje de 90 días?', type: 'textarea' },
+                    { key: 'aprendizaje_clave', label: 'SECCIÓN 3: Revisión Honesta. ¿Cuál fue el aprendizaje clave que me llevo para el próximo ciclo?', type: 'textarea' },
+                    { key: 'victoria_sorpresa', label: 'SECCIÓN 4: Celebración. ¿Cuál fue mi victoria sorpresa, esa que no esperaba, pero que me hizo sonreír?', type: 'textarea' },
+                    { key: 'suelto_nuevo', label: 'SECCIÓN 4: Soltar y Abrazar. ¿Qué suelto (hábito, creencia, patrón) para hacer espacio a lo nuevo?', type: 'textarea' },
+                    { key: 'compromiso_ciclo', label: 'SECCIÓN 4: Soltar y Abrazar. ¿Qué nuevo compromiso, deseo o práctica ABRAZO para el próximo ciclo?', type: 'textarea' },
+                    { key: 'palabras_resonancia', label: 'SECCIÓN 5: Afirmación de Cierre. ¿Qué palabras o sentimientos resuenan más profundamente en mí al leerla?', type: 'textarea', placeholder: 'La afirmación es: "Reconozco mi camino. Honro mis esfuerzos. Me celebro por cada paso dado, por cada aprendizaje. Suelto lo que ya no me sirve y abrazo la renovación. Estoy listo/a para el próximo ciclo con sabiduría y luz."' },
+                    { key: 'escribe_afirmacion', label: 'SECCIÓN 5: Afirmación de Cierre. Escribe esta afirmación con tu mejor caligrafía (simulada):', type: 'textarea', minHeight: '100px' },
+                    { key: 'firma_renovacion', label: 'SECCIÓN 6: COMPROMISO SIMBÓLICO. Firma tu renovación:', type: 'text', className: 'daily-input', minHeight: '60px' },
+                    { key: 'fecha_firma', label: 'SECCIÓN 6: COMPROMISO SIMBÓLICO. Fecha:', type: 'text', className: 'daily-input', minHeight: '60px' },
+                    { key: 'testigo', label: 'SECCIÓN 6: COMPROMISO SIMBÓLICO. Testigo (Opcional):', type: 'text', className: 'daily-input', minHeight: '60px' },
+                    { key: 'palabra_final', label: 'SECCIÓN 6: COMPROMISO SIMBÓLICO. Mi palabra final para este viaje de 90 días:', type: 'textarea' },
+                    { key: 'notas_cierre', label: 'SECCIÓN 7: NOTAS. Espacio para reflexiones finales y deseos.', type: 'textarea', minHeight: '200px', placeholder: 'Escribir un último pensamiento, anotar deseos para el próximo año, etc.' }
+                ]
+            },
+        ];
+        window.workbooksData = workbooksData; 
+
+        // --- UTILS DE GUARDADO ---
+        
+        // Esta función simula un guardado automático con debounce
+        window.saveResponseDebounced = (workbookId, fieldKey, value) => {
+            if (!db || !userId) {
+                console.warn("Database or User ID not initialized. Cannot save.");
+                return;
+            }
+
+            const docRef = doc(db, 'artifacts', appId, 'users', userId, 'workbooks', 'progress');
+            
+            // 1. Actualizar el estado local inmediatamente
+            if (!window.appState.workbookResponses[workbookId]) {
+                window.appState.workbookResponses[workbookId] = {};
+            }
+            window.appState.workbookResponses[workbookId][fieldKey] = value;
+            
+            // 2. Mostrar estado de guardando
+            const saveStatus = document.getElementById('save-status');
+            saveStatus.textContent = 'Guardando...';
+            saveStatus.classList.remove('text-green-600', 'text-red-600', 'opacity-0');
+            saveStatus.classList.add('text-yellow-600', 'opacity-100');
+
+            // 3. Debounce
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(async () => {
+                try {
+                    // Obtener las respuestas a guardar
+                    const responsesToSave = window.appState.workbookResponses;
+                    
+                    // Asegurar que el objeto principal existe y contiene las respuestas
+                    const updatePayload = { 
+                        workbookResponses: responsesToSave,
+                        lastUpdated: new Date().toISOString()
+                    };
+                    
+                    await setDoc(docRef, updatePayload, { merge: true });
+                    
+                    // 4. Mostrar estado de guardado exitoso
+                    saveStatus.textContent = 'Guardado automáticamente. ✅';
+                    saveStatus.classList.remove('text-yellow-600');
+                    saveStatus.classList.add('text-green-600');
+                    // Ocultar después de 2s, asegurando que el estado de 'guardando' se limpie completamente
+                    setTimeout(() => saveStatus.classList.add('opacity-0'), 2000); 
+
+                } catch (error) {
+                    console.error("Error saving workbook response:", error);
+                    saveStatus.textContent = 'Error al guardar. ⚠️';
+                    saveStatus.classList.remove('text-yellow-600', 'text-green-600');
+                    saveStatus.classList.add('text-red-600', 'opacity-100');
+                }
+            }, 1000); // Espera 1 segundo después de la última pulsación
+        };
+
+
+        // --- UI UTILS ---
+
+        function updateUI() {
+            const { currentStep, name, isAuthReady, activeWorkbookId } = window.appState;
+            
+            // Ocultar todo por defecto
+            document.getElementById('loading-indicator').classList.add('hidden');
+            document.getElementById('content-area').classList.add('hidden');
+            document.getElementById('registration-form').classList.add('hidden');
+            document.getElementById('interactive-workbook').classList.add('hidden');
+            document.getElementById('completion-message').classList.add('hidden');
+            
+            if (!isAuthReady) {
+                document.getElementById('loading-indicator').classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('content-area').classList.remove('hidden');
+            
+            // Actualización de la información de usuario en el encabezado
+            if (name) {
+                document.getElementById('greeting-text').innerHTML = `Bienvenido/a, <span class="font-bold text-red-600">${name}</span>. <br> Tu viaje de 90 días: Reflexión, Enfoque y Renovación.`;
+            } else {
+                document.getElementById('greeting-text').innerHTML = `Tu viaje de 90 días: Reflexión, Enfoque y Renovación.`;
+            }
+
+
+            // 1. Mostrar Formulario de Registro si es necesario
+            if (currentStep === 0) {
+                document.getElementById('display-title').textContent = 'Comienza tu Viaje';
+                document.getElementById('registration-form').classList.remove('hidden');
+                window.appState.activeWorkbookId = null;
+            } 
+            // 2. Mostrar Mensaje de Finalización
+            else if (currentStep > workbooksData.length) {
+                document.getElementById('display-title').textContent = 'Viaje Completado';
+                document.getElementById('completion-message').classList.remove('hidden');
+                window.appState.activeWorkbookId = null; 
+            }
+            // 3. Mostrar Contenido de Workbook Interactivo
+            else {
+                
+                // Si no hay un workbook activo, activar el último desbloqueado
+                if (window.appState.activeWorkbookId === null) {
+                    const defaultId = Math.min(currentStep, workbooksData.length);
+                    window.appState.activeWorkbookId = defaultId;
+                }
+
+                if (window.appState.activeWorkbookId !== null) {
+                    displayWorkbookContent(window.appState.activeWorkbookId);
+                } else {
+                    document.getElementById('display-title').textContent = 'Selecciona un Workbook';
+                }
+            }
+
+            // 4. Actualizar la lista de Workbooks
+            renderWorkbookList();
+        }
+
+        function renderWorkbookList() {
+            const listContainer = document.getElementById('workbook-list');
+            listContainer.innerHTML = '';
+            
+            workbooksData.forEach(workbook => {
+                let statusClass = 'locked';
+                let statusText = 'Bloqueado';
+                let icon = '🔒';
+                let disabled = true;
+
+                // Desbloqueado o completado
+                if (window.appState.currentStep >= workbook.id) {
+                    disabled = false;
+                    statusClass = 'unlocked';
+                    statusText = 'Desbloqueado | Empezar';
+                    icon = '▶️';
+                }
+                
+                // Completado
+                if (window.appState.currentStep > workbook.id) {
+                    statusClass = 'completed';
+                    statusText = 'Completado';
+                    icon = '✅';
+                }
+                
+                const card = document.createElement('div');
+                card.className = `workbook-card p-5 shadow-lg ${statusClass}`;
+                
+                if (!disabled) {
+                    card.onclick = () => setAndDisplayActiveWorkbook(workbook.id);
+                }
+
+                const isActive = window.appState.activeWorkbookId === workbook.id;
+                
+                // Añadir clases visuales para el activo
+                if (isActive) {
+                    card.classList.add('border-4', 'border-red-400', 'ring-4', 'ring-red-100');
+                    if(statusClass === 'unlocked') {
+                        statusText = 'ACTIVO | Rellenando';
+                    } else if (statusClass === 'completed') {
+                         statusText = 'Completado | Revisando';
+                    }
+                }
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <p class="text-xs font-semibold uppercase mb-2 flex items-center ${statusClass === 'completed' ? 'text-blue-500' : statusClass === 'unlocked' ? 'text-green-600' : 'text-gray-500'}">
+                            ${icon} <span class="ml-2">${statusText}</span>
+                        </p>
+                    </div>
+                    <h3 class="text-xl font-extrabold text-gray-900">${workbook.title}</h3>
+                    <p class="text-gray-600 mt-1 text-sm">${workbook.subtitle}</p>
+                `;
+                listContainer.appendChild(card);
+            });
+        }
+        
+        function setAndDisplayActiveWorkbook(id) {
+            window.appState.activeWorkbookId = id;
+            updateUI();
+        }
+
+
+        function displayWorkbookContent(id) {
+            const workbook = workbooksData.find(w => w.id === id);
+            
+            if (!workbook) {
+                document.getElementById('display-title').textContent = 'Workbook no Encontrado';
+                return;
+            }
+
+            // Ocultar elementos no relevantes
+            document.getElementById('registration-form').classList.add('hidden');
+            document.getElementById('completion-message').classList.add('hidden');
+            
+            // Mostrar el área interactiva
+            document.getElementById('interactive-workbook').classList.remove('hidden');
+            document.getElementById('display-title').textContent = `${workbook.title}: ${workbook.subtitle}`;
+            document.getElementById('display-snippet').textContent = workbook.snippet;
+            
+            // Renderizar Formulario Interactivo
+            const formFieldsContainer = document.getElementById('form-fields');
+            formFieldsContainer.innerHTML = ''; // Limpiar campos previos
+            
+            const currentResponses = window.appState.workbookResponses[id] || {};
+            let currentSection = '';
+
+            workbook.sections.forEach((section) => {
+                const fieldKey = section.key;
+                const currentValue = currentResponses[fieldKey] || '';
+                
+                // Extraer el número de sección para el encabezado visual
+                const sectionNumberMatch = section.label.match(/SECCIÓN\s*(\d+)/);
+                const sectionNumber = sectionNumberMatch ? `SECCIÓN ${sectionNumberMatch[1]}` : 'SECCIÓN ADICIONAL';
+                
+                // Solo renderizar el encabezado si la sección ha cambiado
+                if (currentSection !== sectionNumber) {
+                    currentSection = sectionNumber;
+                    const header = `<h3 class="section-header">${sectionNumber}</h3>`;
+                    formFieldsContainer.insertAdjacentHTML('beforeend', header);
+                }
+                
+                const inputType = section.type === 'text' ? 'input' : 'textarea';
+                const inputClass = section.className || 'textarea-response';
+                const minHeightStyle = section.minHeight ? `min-height: ${section.minHeight};` : '';
+                
+                // Sanitizar Placeholder
+                const placeholderText = section.placeholder ? section.placeholder.replace(/"/g, '&quot;') : (section.type === 'text' ? '' : 'Escribe tu respuesta aquí...');
+
+                let fieldHtml = '';
+
+                if (inputType === 'textarea') {
+                    fieldHtml = `
+                        <div class="form-group">
+                            <label for="field-${fieldKey}" class="block text-base font-bold text-gray-700 mb-2 border-l-4 border-red-300 pl-3">
+                                ${section.label.replace(/SECCIÓN\s*\d+:\s*/, '')}
+                            </label>
+                            <textarea 
+                                id="field-${fieldKey}" 
+                                name="${fieldKey}" 
+                                class="${inputClass} w-full text-gray-700"
+                                style="${minHeightStyle}"
+                                placeholder="${placeholderText}"
+                                oninput="window.saveResponseDebounced(${id}, '${fieldKey}', this.value)"
+                                ${window.appState.currentStep < id ? 'disabled' : ''}
+                            >${currentValue}</textarea>
+                        </div>
+                    `;
+                } else { // type === 'text'
+                     fieldHtml = `
+                        <div class="form-group">
+                            <label for="field-${fieldKey}" class="block text-base font-bold text-gray-700 mb-2 border-l-4 border-red-300 pl-3">
+                                ${section.label.replace(/SECCIÓN\s*\d+:\s*/, '')}
+                            </label>
+                            <input
+                                type="text"
+                                id="field-${fieldKey}" 
+                                name="${fieldKey}" 
+                                value="${currentValue}"
+                                class="w-full p-2 border border-gray-300 focus:ring-red-500 focus:border-red-500 rounded-lg ${inputClass}"
+                                style="${minHeightStyle}"
+                                placeholder="${placeholderText}"
+                                oninput="window.saveResponseDebounced(${id}, '${fieldKey}', this.value)"
+                                ${window.appState.currentStep < id ? 'disabled' : ''}
+                            />
+                        </div>
+                    `;
+                }
+
+
+                formFieldsContainer.insertAdjacentHTML('beforeend', fieldHtml);
+            });
+
+
+            // Botón de Completado
+            const completionBtn = document.getElementById('completion-button');
+            const nextStep = workbook.id + 1;
+            
+            if (window.appState.currentStep > workbook.id) {
+                // Ya completado
+                completionBtn.disabled = true;
+                completionBtn.textContent = '¡Ya has completado este Workbook! ✅';
+            } else if (window.appState.currentStep === workbook.id) {
+                // Desbloqueado, listo para completar
+                completionBtn.disabled = false;
+                completionBtn.textContent = (nextStep <= workbooksData.length) 
+                    ? 'Marcar como Completado y Desbloquear Siguiente'
+                    : 'Marcar como Completado y Finalizar Viaje';
+            } else {
+                // Bloqueado
+                completionBtn.disabled = true;
+                completionBtn.textContent = 'Completa el Workbook anterior para desbloquear';
+            }
+        }
+
+
+        // --- FIRESTORE / AUTH LOGIC ---
+
+        async function initFirebase() {
+            try {
+                if (!firebaseConfig) {
+                    throw new Error("Firebase config is missing.");
+                }
+
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Autenticación con token o anónima
+                const userCredential = initialAuthToken 
+                    ? await signInWithCustomToken(auth, initialAuthToken)
+                    : await signInAnonymously(auth);
+                
+                userId = userCredential.user.uid;
+
+                // Set up snapshot listener for real-time progress updates
+                setupSnapshotListener();
+            } catch (error) {
+                console.error("Error initializing Firebase or signing in:", error);
+                document.getElementById('error-text').textContent = `Error: ${error.message}`;
+                document.getElementById('error-message').classList.remove('hidden');
+                window.appState.isAuthReady = true;
+                updateUI();
+            }
+        }
+        
+        function setupSnapshotListener() {
+            if (unsubscribe) {
+                unsubscribe();
+            }
+
+            const docRef = doc(db, 'artifacts', appId, 'users', userId, 'workbooks', 'progress');
+            
+            // Listen for real-time updates to the user's progress
+            unsubscribe = onSnapshot(docRef, (docSnap) => {
+                const oldStep = window.appState.currentStep;
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    
+                    window.appState.currentStep = data.currentStep || 0;
+                    window.appState.name = data.name || null; 
+                    window.appState.workbookResponses = data.workbookResponses || {}; // Cargar respuestas
+                    
+                    // Lógica para establecer el activeWorkbookId después del registro o al avanzar.
+                    if (window.appState.currentStep > 0 && oldStep === 0) {
+                        window.appState.activeWorkbookId = 1; 
+                    } else if (window.appState.currentStep > oldStep && window.appState.currentStep <= workbooksData.length) {
+                        window.appState.activeWorkbookId = window.appState.currentStep;
+                    }
+
+                } else {
+                    // Document doesn't exist, initial state is 0
+                    window.appState.currentStep = 0;
+                    window.appState.name = null;
+                    window.appState.activeWorkbookId = null;
+                    window.appState.workbookResponses = {};
+                }
+                
+                window.appState.isAuthReady = true;
+                updateUI(); // Re-render UI upon data change
+            }, (error) => {
+                console.error("Error reading Firestore data:", error);
+                document.getElementById('error-text').textContent = `Error al sincronizar progreso: ${error.message}`;
+                document.getElementById('error-message').classList.remove('hidden');
+                window.appState.isAuthReady = true;
+                updateUI();
+            });
+        }
+
+        window.handleRegistration = async () => {
+            const nameInput = document.getElementById('name-input');
+            const emailInput = document.getElementById('email-input');
+            const name = nameInput.value.trim();
+            const email = emailInput.value.trim();
+            const registerBtn = document.getElementById('register-button');
+
+            let isValid = true;
+            // Validar
+            nameInput.classList.remove('border-red-500', 'ring-red-200', 'ring-2');
+            emailInput.classList.remove('border-red-500', 'ring-red-200', 'ring-2');
+            if (!name) { nameInput.focus(); nameInput.classList.add('border-red-500', 'ring-red-200', 'ring-2'); isValid = false; }
+            if (!email || !email.includes('@')) { if (isValid) emailInput.focus(); emailInput.classList.add('border-red-500', 'ring-red-200', 'ring-2'); isValid = false; }
+
+            if (!isValid) return;
+
+            registerBtn.disabled = true;
+            registerBtn.textContent = 'Registrando...';
+
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'workbooks', 'progress');
+                
+                await setDoc(docRef, { 
+                    name: name, 
+                    email: email, 
+                    currentStep: 1, 
+                    registrationDate: new Date().toISOString() 
+                }, { merge: true });
+                
+            } catch (error) {
+                console.error("Error saving registration:", error);
+                document.getElementById('error-text').textContent = `Error al guardar el registro: ${error.message}`;
+                document.getElementById('error-message').classList.remove('hidden');
+                
+                registerBtn.disabled = false;
+                registerBtn.textContent = 'Error. Intenta de Nuevo.';
+            }
+        };
+
+        window.markAsCompleted = async () => {
+            const currentId = window.appState.activeWorkbookId;
+            const nextStep = currentId + 1;
+            const completionBtn = document.getElementById('completion-button');
+
+            if (window.appState.currentStep !== currentId || currentId === null) { return; }
+            
+            completionBtn.disabled = true;
+            completionBtn.textContent = 'Guardando Progreso...';
+            
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'workbooks', 'progress');
+                
+                // Actualizar a siguiente paso. Las respuestas se guardaron automáticamente.
+                await setDoc(docRef, { 
+                    currentStep: nextStep, 
+                    [`completed_${currentId}`]: new Date().toISOString()
+                }, { merge: true });
+
+            } catch (error) {
+                console.error("Error updating progress:", error);
+                document.getElementById('error-text').textContent = `Error al actualizar el progreso: ${error.message}`;
+                document.getElementById('error-message').classList.remove('hidden');
+
+                completionBtn.disabled = false;
+                completionBtn.textContent = 'Error. Intenta de Nuevo.';
+            }
+        };
+        
+        // Initial call
+        initFirebase();
+    </script>
+</body>
+</html>
